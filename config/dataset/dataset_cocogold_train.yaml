@@ -1,0 +1,5 @@
+dataset:
+  train:
+    name: cocogold
+    disp_name: cocogold_train
+    split: "train"

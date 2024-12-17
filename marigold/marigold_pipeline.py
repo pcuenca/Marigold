@@ -148,6 +148,7 @@ class MarigoldPipeline(DiffusionPipeline):
     def __call__(
         self,
         input_image: Union[Image.Image, torch.Tensor],
+        text_embeds: Optional[torch.Tensor] = None,
         denoising_steps: Optional[int] = None,
         ensemble_size: int = 5,
         processing_res: Optional[int] = None,
@@ -274,6 +275,7 @@ class MarigoldPipeline(DiffusionPipeline):
             (batched_img,) = batch
             depth_pred_raw = self.single_infer(
                 rgb_in=batched_img,
+                text_embeds=text_embeds,
                 num_inference_steps=denoising_steps,
                 show_pbar=show_progress_bar,
                 generator=generator,
@@ -370,6 +372,7 @@ class MarigoldPipeline(DiffusionPipeline):
     def single_infer(
         self,
         rgb_in: torch.Tensor,
+        text_embeds: Optional[torch.Tensor],
         num_inference_steps: int,
         generator: Union[torch.Generator, None],
         show_pbar: bool,
@@ -407,12 +410,14 @@ class MarigoldPipeline(DiffusionPipeline):
             generator=generator,
         )  # [B, 4, h, w]
 
-        # Batched empty text embedding
-        if self.empty_text_embed is None:
-            self.encode_empty_text()
-        batch_empty_text_embed = self.empty_text_embed.repeat(
-            (rgb_latent.shape[0], 1, 1)
-        ).to(device)  # [B, 2, 1024]
+        if text_embeds is None:
+            # Batched empty text embedding
+            if self.empty_text_embed is None:
+                self.encode_empty_text()
+            text_embeds = self.empty_text_embed.repeat(
+                (rgb_latent.shape[0], 1, 1)
+            )
+        text_embeds = text_embeds.to(device)  # [B, 2 or 77, 1024]
 
         # Denoising loop
         if show_pbar:
@@ -432,7 +437,7 @@ class MarigoldPipeline(DiffusionPipeline):
 
             # predict the noise residual
             noise_pred = self.unet(
-                unet_input, t, encoder_hidden_states=batch_empty_text_embed
+                unet_input, t, encoder_hidden_states=text_embeds
             ).sample  # [B, 4, h, w]
 
             # compute the previous noisy sample x_t -> x_t-1
@@ -485,5 +490,11 @@ class MarigoldPipeline(DiffusionPipeline):
         z = self.vae.post_quant_conv(depth_latent)
         stacked = self.vae.decoder(z)
         # mean of output channels
-        depth_mean = stacked.mean(dim=1, keepdim=True)
-        return depth_mean
+        # depth_mean = stacked.mean(dim=1, keepdim=True)
+
+        # TODO: testing something else instead of mean
+        # TODO: make this configurable so the pipeline is compatible with depth / segmentation
+        stacked[stacked >= 0] = 1
+        stacked[stacked <= 0] = -1
+        stacked = stacked.sum(dim=1, keepdim=True)  # will be clipped later
+        return stacked

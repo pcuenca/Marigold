@@ -1,0 +1,6 @@
+dataset:
+  vis:
+    name: cocogold
+    disp_name: cocogold_vis
+    split: "val"
+    max_items: 8

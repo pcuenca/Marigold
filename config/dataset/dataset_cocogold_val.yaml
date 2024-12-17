@@ -1,0 +1,8 @@
+dataset:
+  val:
+  # Smaller subsets for faster validation during training
+  # The first dataset is used to calculate main eval metric.
+    name: cocogold
+    disp_name: cocogold_val
+    split: "val"
+    max_items: 16
