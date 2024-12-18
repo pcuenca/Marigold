@@ -588,11 +588,11 @@ class CocogoldTrainer:
 
             if i % log_images_every == 0:
                 if wandb_run is not None:
-                    wandb_run.log({"validation": formatted_images}, step=step)
+                    wandb_run.log({"validation": formatted_images})
                 formatted_images = []
 
         if wandb_run is not None and len(formatted_images) > 0:
-            wandb_run.log({"validation": formatted_images}, step=step)
+            wandb_run.log({"validation": formatted_images})
         return metric_tracker.result()
 
     def _get_next_seed(self):
