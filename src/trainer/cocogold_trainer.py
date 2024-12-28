@@ -1,4 +1,4 @@
-# Based on marigold_trainer.py by Pedro Cuenca
+# Based on marigold_trainer.py, changes by Pedro Cuenca
 # --------------------------------------------------------------------------
 
 
@@ -192,7 +192,7 @@ class CocogoldTrainer:
             logging.info(
                 "Last evaluation was not finished, will do evaluation before continue training."
             )
-            self.validate(step=self.effective_iter)
+            self.validate()
 
         self.train_metrics.reset()
         accumulated_step = 0
@@ -201,8 +201,13 @@ class CocogoldTrainer:
             self.epoch = epoch
             logging.debug(f"epoch: {self.epoch}")
 
+            # nit: new shuffle every epoch
+            self.train_loader.dataset.seed += 7
+
             # Skip previous batches when resume
-            for batch in skip_first_batches(self.train_loader, self.n_batch_in_epoch):
+            ## TODO: disabled for now to see if it has something to do with the deadlocking
+            #for batch in skip_first_batches(self.train_loader, self.n_batch_in_epoch):
+            for batch in self.train_loader:
                 self.model.unet.train()
 
                 # globally consistent random generators
@@ -487,7 +492,7 @@ class CocogoldTrainer:
         val_seed_ls = generate_seed_sequence(val_init_seed, len(data_loader))
 
         formatted_images = []
-        log_images_every = 4
+        log_images_every = 8
         for i, batch in enumerate(
             tqdm(data_loader, desc=f"evaluating on {name}"),
             start=1,
