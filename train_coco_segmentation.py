@@ -262,7 +262,7 @@ if "__main__" == __name__:
         base_data_dir,
         split=cfg_data.train.split,
         return_type="pt",
-        shuffle=True,
+        seed=cfg.dataloader.seed,
     )
     # logging.debug("Augmentation: ", cfg.augmentation)
     train_loader = DataLoader(
@@ -273,34 +273,36 @@ if "__main__" == __name__:
     )
 
     # Validation dataset - This is not iterable because validation / visualization use `len` for some reason
-    val_dataset = CocoGoldDataset(
+    # TODO: testing the iterable version after implementing __len__
+    val_dataset = CocoGoldIterableDataset(
         base_data_dir,
         split=cfg_data.val.split,
         max_items=cfg_data.val.max_items,
         return_type="pt",
+        seed=cfg.dataloader.seed,
     )
     val_loader = DataLoader(
         dataset=val_dataset,
         # Hardcoded to 1 in the validation loop
         batch_size=1,   #cfg.dataloader.max_train_batch_size,
-        num_workers=1,      #cfg.dataloader.num_workers,
-        shuffle=False,
+        num_workers=0,      #cfg.dataloader.num_workers,
     )
     val_loaders = [val_loader]
 
     # Visualization dataset - This is not iterable because validation / visualization use `len` for some reason
-    vis_dataset = CocoGoldDataset(
+    # TODO: testing the iterable version after implementing __len__
+    vis_dataset = CocoGoldIterableDataset(
         base_data_dir,
         split=cfg_data.vis.split,
         max_items=cfg_data.vis.max_items,
         return_type="pt",
+        seed=cfg.dataloader.seed,
     )
     vis_loader = DataLoader(
         dataset=vis_dataset,
         # Hardcoded to 1 in the validation loop
         batch_size=1,   #cfg.dataloader.max_train_batch_size,
-        num_workers=1,  #cfg.dataloader.num_workers,
-        shuffle=False,
+        num_workers=0,  #cfg.dataloader.num_workers,
     )
     vis_loaders = [vis_loader]
 
