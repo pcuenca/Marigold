@@ -39,7 +39,7 @@ trainer:
   save_period: 500
   backup_period: 2000
   validation_period: 2000
-  visualization_period: 200  # was: 500
+  visualization_period: 50  # was: 500
 
 multi_res_noise:
   strength: 0.9

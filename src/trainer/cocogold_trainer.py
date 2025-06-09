@@ -179,6 +179,7 @@ class CocogoldTrainer:
             return_tensors="pt",
         ).to(self.device)
         # We should not use attention mask in this model, I think
+        # ^ self.model.text_encoder.config does not contain `use_attention_mask`
         text_embeddings = self.model.text_encoder(text_inputs.input_ids)[0].to(self.model.unet.dtype)
         return text_embeddings
 
@@ -306,16 +307,24 @@ class CocogoldTrainer:
                 else:
                     raise ValueError(f"Unknown prediction type {self.prediction_type}")
 
-                # Masked latent loss
-                if self.gt_mask_type is not None:
-                    latent_loss = self.loss(
-                        model_pred[valid_mask_down].float(),
-                        target[valid_mask_down].float(),
-                    )
-                else:
-                    latent_loss = self.loss(model_pred.float(), target.float())
+                # # Masked latent loss
+                # if self.gt_mask_type is not None:
+                #     latent_loss = self.loss(
+                #         model_pred[valid_mask_down].float(),
+                #         target[valid_mask_down].float(),
+                #     )
+                # else:
+                #     latent_loss = self.loss(model_pred.float(), target.float())
+                #
+                # loss = latent_loss.mean()
 
-                loss = latent_loss.mean()
+                # Crude focal loss adaptation
+
+                # Compute per-pixel loss
+                pixel_loss = (model_pred - target) ** 2
+                # Focal weighting: emphasize hard examples
+                focal_weight = (1 - torch.exp(-pixel_loss)).pow(2)
+                loss = (pixel_loss * focal_weight).mean()
 
                 self.train_metrics.update("loss", loss.item())
 
