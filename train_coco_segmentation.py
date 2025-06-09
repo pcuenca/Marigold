@@ -256,6 +256,13 @@ if "__main__" == __name__:
     else:
         loader_generator = torch.Generator().manual_seed(loader_seed)
 
+    # Hardcode a few valid categories
+    # We are excluding `person` (very overrepresented), and keeping the 14 most frequent classes after that
+    valid_categories = [
+        "car", "dining table", "chair", "train", "airplane",
+        "giraffe", "clock", "toilet", "bed", "bird",
+        "truck", "cat", "horse", "dog",
+    ]
     # Training dataset
     # It will be shuffled, which may interfere with reproducibility on resume
     train_dataset = CocoGoldIterableDataset(
@@ -263,7 +270,9 @@ if "__main__" == __name__:
         split=cfg_data.train.split,
         return_type="pt",
         seed=cfg.dataloader.seed,
+        valid_cat_names=valid_categories,
     )
+    print(f"Training dataset has {len(train_dataset)} images for the selected categories")
     # logging.debug("Augmentation: ", cfg.augmentation)
     train_loader = DataLoader(
         dataset=train_dataset,
@@ -280,6 +289,7 @@ if "__main__" == __name__:
         max_items=cfg_data.val.max_items,
         return_type="pt",
         seed=cfg.dataloader.seed,
+        valid_cat_names=valid_categories,
     )
     val_loader = DataLoader(
         dataset=val_dataset,
@@ -297,6 +307,7 @@ if "__main__" == __name__:
         max_items=cfg_data.vis.max_items,
         return_type="pt",
         seed=cfg.dataloader.seed,
+        valid_cat_names=valid_categories,
     )
     vis_loader = DataLoader(
         dataset=vis_dataset,
@@ -347,4 +358,4 @@ if "__main__" == __name__:
     try:
         trainer.train(t_end=t_end)
     except Exception as e:
-        logging.exception(e)
+        logging.exception(e), 
