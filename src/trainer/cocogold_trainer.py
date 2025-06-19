@@ -226,6 +226,9 @@ class CocogoldTrainer:
                 rgb = batch["image"].to(device)
                 gt_for_latent = batch[self.gt_type].to(device)
 
+                # Overlap with image so training is more challenging and hopefully doesn't degenerate to the trivial case (all black)
+                gt_for_latent = torch.where(gt_for_latent == -1, rgb, gt_for_latent)
+
                 if self.gt_mask_type is not None:
                     valid_mask_for_latent = batch[self.gt_mask_type].to(device)
                     invalid_mask = ~valid_mask_for_latent
@@ -322,9 +325,12 @@ class CocogoldTrainer:
 
                 # Compute per-pixel loss
                 pixel_loss = (model_pred - target) ** 2
-                # Focal weighting: emphasize hard examples
-                focal_weight = (1 - torch.exp(-pixel_loss)).pow(2)
-                loss = (pixel_loss * focal_weight).mean()
+
+                # Disabling "focal weighting for the overlapping test"
+                # # Focal weighting: emphasize hard examples
+                # focal_weight = (1 - torch.exp(-pixel_loss)).pow(2)
+                # pixel_loss = (pixel_loss * focal_weight)#.mean()
+                loss = pixel_loss.mean()
 
                 self.train_metrics.update("loss", loss.item())
 
@@ -555,7 +561,9 @@ class CocogoldTrainer:
             )
 
             depth_pred: np.ndarray = pipe_out.depth_np
-            formatted_images.append(wandb.Image(depth_pred, caption=batch["class"]))
+            formatted_images.append(wandb.Image(pipe_out.depth_colored, caption=f"{batch['class'][0]} - raw"))
+            formatted_images.append(wandb.Image(depth_pred, caption=f"{batch['class'][0]} - mean"))
+            formatted_images.append(wandb.Image(pipe_out.stacked, caption=f"{batch['class'][0]} - stacked"))
 
             # TODO - ignore this for now
             # if "least_square" == self.cfg.eval.alignment:
