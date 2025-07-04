@@ -265,6 +265,7 @@ class MarigoldPipeline(DiffusionPipeline):
 
         # Predict depth maps (batched)
         depth_pred_ls = []
+        raw_predictions_ls = []
         if show_progress_bar:
             iterable = tqdm(
                 single_rgb_loader, desc=" " * 2 + "Inference batches", leave=False
@@ -273,7 +274,7 @@ class MarigoldPipeline(DiffusionPipeline):
             iterable = single_rgb_loader
         for batch in iterable:
             (batched_img,) = batch
-            depth_pred_raw = self.single_infer(
+            depth_pred_raw, predicted = self.single_infer(
                 rgb_in=batched_img,
                 text_embeds=text_embeds,
                 num_inference_steps=denoising_steps,
@@ -281,7 +282,9 @@ class MarigoldPipeline(DiffusionPipeline):
                 generator=generator,
             )
             depth_pred_ls.append(depth_pred_raw.detach())
+            raw_predictions_ls.append(predicted.detach())
         depth_preds = torch.concat(depth_pred_ls, dim=0)
+        raw_preds = torch.concat(raw_predictions_ls, dim=0)
         torch.cuda.empty_cache()  # clear vram cache for ensembling
 
         # ----------------- Test-time ensembling -----------------
@@ -324,7 +327,9 @@ class MarigoldPipeline(DiffusionPipeline):
             depth_colored_hwc = chw2hwc(depth_colored)
             depth_colored_img = Image.fromarray(depth_colored_hwc)
         else:
-            depth_colored_img = None
+            depth_colored = (raw_preds.cpu().numpy() * 255).astype(np.uint8)
+            depth_colored_hwc = chw2hwc(depth_colored.squeeze())
+            depth_colored_img = Image.fromarray(depth_colored_hwc)
 
         return MarigoldDepthOutput(
             depth_np=depth_pred,
@@ -445,14 +450,17 @@ class MarigoldPipeline(DiffusionPipeline):
                 noise_pred, t, depth_latent, generator=generator
             ).prev_sample
 
-        depth = self.decode_depth(depth_latent)
+        # `decode_depth` is the old name; in our case our predictions are the segmentation masks
+        # We return raw outputs and mean for visualization
+        predicted = self.decode_depth(depth_latent)
+        predicted_mean = predicted.mean(dim=1, keepdim=True)
 
-        # clip prediction
-        depth = torch.clip(depth, -1.0, 1.0)
-        # shift to [0, 1]
-        depth = (depth + 1.0) / 2.0
+        predicted_mean = torch.clip(predicted_mean, -1.0, 1.0)
+        predicted_mean = (predicted_mean + 1.0) / 2.0
 
-        return depth
+        predicted = torch.clip(predicted, -1.0, 1.0)
+        predicted = (predicted + 1.0) / 2.0
+        return predicted_mean, predicted
 
     def encode_rgb(self, rgb_in: torch.Tensor) -> torch.Tensor:
         """
@@ -492,9 +500,4 @@ class MarigoldPipeline(DiffusionPipeline):
         # mean of output channels
         # depth_mean = stacked.mean(dim=1, keepdim=True)
 
-        # TODO: testing something else instead of mean
-        # TODO: make this configurable so the pipeline is compatible with depth / segmentation
-        stacked[stacked >= 0] = 1
-        stacked[stacked <= 0] = -1
-        stacked = stacked.sum(dim=1, keepdim=True)  # will be clipped later
         return stacked

@@ -38,7 +38,7 @@ trainer:
   init_seed: 2024  # use null to train w/o seeding
   save_period: 500
   backup_period: 2000
-  validation_period: 2000
+  validation_period: 500
   visualization_period: 50  # was: 500
 
 multi_res_noise:
@@ -86,14 +86,5 @@ eval:
   alignment:
   align_max_res: null
   eval_metrics:
-  # TODO: iou, maybe
-  - abs_relative_difference
+  # TODO: iou
   - squared_relative_difference
-  # - rmse_linear
-  # - rmse_log
-  # - log10
-  # - delta1_acc
-  # - delta2_acc
-  # - delta3_acc
-  # - i_rmse
-  # - silog_rmse
