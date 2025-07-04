@@ -87,11 +87,7 @@ class CocogoldTrainer:
         )
         self.lr_scheduler = LambdaLR(optimizer=self.optimizer, lr_lambda=lr_func)
 
-        # Loss
-        ## TODO: we only require two classes (for now): background and subject.
-        # We could potentially use binary cross-entropy and use sigmoid/tanh to get pixels to -1 or 1.
-        # But this requires decoding the predictions through the VAE to get the pixels from the latents.
-        # We'll just use MSE for now to compare the latents.
+        # Loss - just MSE
         self.loss = get_loss(loss_name=self.cfg.loss.name, **self.cfg.loss.kwargs)
 
         # Training noise scheduler
@@ -206,7 +202,7 @@ class CocogoldTrainer:
             self.train_loader.dataset.seed += 7
 
             # Skip previous batches when resume
-            ## TODO: disabled for now to see if it has something to do with the deadlocking
+            ## TODO: disabled for now
             #for batch in skip_first_batches(self.train_loader, self.n_batch_in_epoch):
             for batch in self.train_loader:
                 self.model.unet.train()
@@ -281,8 +277,8 @@ class CocogoldTrainer:
                     gt_latent, noise, timesteps
                 )  # [B, 4, h, w]
 
-                # Text embedding
-                ## TODO: should we use a sentence such as "detect {class}" or something like that?
+                # Text embedding - we just use the class name
+                ## TODO: richer sentences for fine grained understanding
                 text_embed = self.encode_prompt(batch["class"]).to(device)  # [B, 77, 1024]
 
                 # Concat rgb and depth latents
@@ -310,28 +306,8 @@ class CocogoldTrainer:
                 else:
                     raise ValueError(f"Unknown prediction type {self.prediction_type}")
 
-                # # Masked latent loss
-                # if self.gt_mask_type is not None:
-                #     latent_loss = self.loss(
-                #         model_pred[valid_mask_down].float(),
-                #         target[valid_mask_down].float(),
-                #     )
-                # else:
-                #     latent_loss = self.loss(model_pred.float(), target.float())
-                #
-                # loss = latent_loss.mean()
-
-                # Crude focal loss adaptation
-
-                # Compute per-pixel loss
-                pixel_loss = (model_pred - target) ** 2
-
-                # Disabling "focal weighting for the overlapping test"
-                # # Focal weighting: emphasize hard examples
-                # focal_weight = (1 - torch.exp(-pixel_loss)).pow(2)
-                # pixel_loss = (pixel_loss * focal_weight)#.mean()
-                loss = pixel_loss.mean()
-
+                latent_loss = (model_pred - target) ** 2
+                loss = latent_loss.mean()
                 self.train_metrics.update("loss", loss.item())
 
                 loss = loss / self.gradient_accumulation_steps
@@ -527,11 +503,9 @@ class CocogoldTrainer:
 
             if self.cfg.gt_mask_type is not None:
                 valid_mask_ts = batch["valid_mask_raw"].squeeze()
-                valid_mask = valid_mask_ts.numpy()
                 valid_mask_ts = valid_mask_ts.to(self.device)
             else:
                 valid_mask_ts = None
-                valid_mask = None
 
             # Random number generator
             seed = val_seed_ls.pop()
@@ -544,8 +518,6 @@ class CocogoldTrainer:
             text_embeds = self.encode_prompt(batch["class"])
 
             # Predict
-            ## TODO: change output type
-            ## TODO: prompt
             pipe_out: MarigoldDepthOutput = self.model(
                 rgb_int,
                 text_embeds=text_embeds,
@@ -564,28 +536,6 @@ class CocogoldTrainer:
             formatted_images.append(wandb.Image(pipe_out.depth_colored, caption=f"{batch['class'][0]} - raw"))
             formatted_images.append(wandb.Image(depth_pred, caption=f"{batch['class'][0]} - mean"))
             formatted_images.append(wandb.Image(pipe_out.stacked, caption=f"{batch['class'][0]} - stacked"))
-
-            # TODO - ignore this for now
-            # if "least_square" == self.cfg.eval.alignment:
-            #     depth_pred, scale, shift = align_depth_least_square(
-            #         gt_arr=gt,
-            #         pred_arr=depth_pred,
-            #         valid_mask_arr=valid_mask,
-            #         return_scale_shift=True,
-            #         max_resolution=self.cfg.eval.align_max_res,
-            #     )
-            # else:
-            #     raise RuntimeError(f"Unknown alignment type: {self.cfg.eval.alignment}")
-
-            # # Clip to dataset min max
-            # depth_pred = np.clip(
-            #     depth_pred,
-            #     a_min=data_loader.dataset.min_depth,
-            #     a_max=data_loader.dataset.max_depth,
-            # )
-            
-            # # clip to d > 0 for evaluation
-            # depth_pred = np.clip(depth_pred, a_min=1e-6, a_max=None)
 
             # Evaluate
             sample_metric = []

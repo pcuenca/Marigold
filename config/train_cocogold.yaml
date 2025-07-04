@@ -86,14 +86,5 @@ eval:
   alignment:
   align_max_res: null
   eval_metrics:
-  # TODO: iou, maybe
-  - abs_relative_difference
+  # TODO: iou
   - squared_relative_difference
-  # - rmse_linear
-  # - rmse_log
-  # - log10
-  # - delta1_acc
-  # - delta2_acc
-  # - delta3_acc
-  # - i_rmse
-  # - silog_rmse

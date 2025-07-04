@@ -29,21 +29,14 @@ from typing import List
 
 import torch
 from omegaconf import OmegaConf
-from torch.utils.data import ConcatDataset, DataLoader
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from marigold.marigold_pipeline import MarigoldPipeline
-from src.dataset import BaseDepthDataset, DatasetMode, get_dataset
-from src.dataset.mixed_sampler import MixedBatchSampler
 from src.trainer import get_trainer_cls
 from src.util.config_util import (
     find_value_in_omegaconf,
     recursive_load_config,
-)
-# TODO: remove
-from src.util.depth_transform import (
-    DepthNormalizerBase,
-    get_depth_normalizer,
 )
 from src.util.logging_util import (
     config_logging,
@@ -55,7 +48,7 @@ from src.util.logging_util import (
 )
 from src.util.slurm_util import get_local_scratch_dir, is_on_slurm
 
-from cocogold.dataset import CocoGoldDataset, CocoGoldIterableDataset
+from cocogold.dataset import CocoGoldIterableDataset
 
 if "__main__" == __name__:
     t_start = datetime.now()
@@ -281,8 +274,6 @@ if "__main__" == __name__:
         generator=loader_generator,
     )
 
-    # Validation dataset - This is not iterable because validation / visualization use `len` for some reason
-    # TODO: testing the iterable version after implementing __len__
     val_dataset = CocoGoldIterableDataset(
         base_data_dir,
         split=cfg_data.val.split,
@@ -299,8 +290,6 @@ if "__main__" == __name__:
     )
     val_loaders = [val_loader]
 
-    # Visualization dataset - This is not iterable because validation / visualization use `len` for some reason
-    # TODO: testing the iterable version after implementing __len__
     vis_dataset = CocoGoldIterableDataset(
         base_data_dir,
         split=cfg_data.vis.split,
